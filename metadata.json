@@ -1,0 +1,6 @@
+{
+  "name": "Royal Studio Manager",
+  "description": "Enterprise ERP and management system for Royal Studio photography and videography in Pakistan.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
