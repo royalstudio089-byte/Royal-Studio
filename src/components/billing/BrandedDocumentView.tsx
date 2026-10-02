@@ -102,7 +102,7 @@ export const BrandedDocumentView: React.FC<BrandedDocumentViewProps> = ({
         paymentTerms: profile.paymentTerms || 'Bank Transfer / Cash / JazzCash',
         notes: `Invoice for ${event.title}`,
         status: balanceDue <= 0 ? 'Paid' : (amountPaid > 0 ? 'Partially Paid' : 'Unpaid'),
-        createdBy: 'admin'
+        createdBy: 'Royal Studio'
       };
       generateInvoicePDF(invToPrint, event, client, profile, daySchedules, relevantPayments);
     } else {
@@ -119,7 +119,7 @@ export const BrandedDocumentView: React.FC<BrandedDocumentViewProps> = ({
         total: grandTotal,
         paymentTerms: profile.paymentTerms || '50% advance to lock dates and crew',
         notes: `Proposal for ${event.title}`,
-        createdBy: 'admin'
+        createdBy: 'Royal Studio'
       };
       generateQuotationPDF(quoToPrint, event, client, profile, daySchedules);
     }

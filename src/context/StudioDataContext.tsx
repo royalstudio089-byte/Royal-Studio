@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import {
+  User,
   Client,
   Event,
   EventDaySchedule,
@@ -38,6 +39,7 @@ interface StudioDataContextType {
 
   // Data Entities
   profile: AdminProfile | null;
+  users: User[];
   clients: Client[];
   events: Event[];
   daySchedules: EventDaySchedule[];
@@ -116,6 +118,12 @@ interface StudioDataContextType {
   processPayoutBatch: (payouts: any[]) => Promise<any>;
 
   fetchAIBriefing: () => Promise<AIBriefing>;
+
+  // User Accounts & Staff Login Management
+  createStaffUser: (userData: { teamMemberId: string; email: string; password: string; name?: string; phone?: string }) => Promise<User>;
+  updateUserStatus: (id: string, status: 'ACTIVE' | 'DISABLED') => Promise<void>;
+  resetUserPassword: (id: string, password: string) => Promise<void>;
+  deleteUser: (id: string) => Promise<void>;
 }
 
 const StudioDataContext = createContext<StudioDataContextType | undefined>(undefined);
@@ -128,6 +136,7 @@ export const StudioDataProvider: React.FC<{ children: ReactNode }> = ({ children
 
   // Entities state
   const [profile, setProfile] = useState<AdminProfile | null>(null);
+  const [users, setUsers] = useState<User[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [daySchedules, setDaySchedules] = useState<EventDaySchedule[]>([]);
@@ -165,6 +174,7 @@ export const StudioDataProvider: React.FC<{ children: ReactNode }> = ({ children
       setError(null);
       const data = await apiRequest<any>('/api/db/all');
       setProfile(data.profile);
+      setUsers(data.users || []);
       setClients(data.clients || []);
       setEvents(data.events || []);
       setDaySchedules(data.daySchedules || []);
@@ -741,6 +751,64 @@ export const StudioDataProvider: React.FC<{ children: ReactNode }> = ({ children
     }
   };
 
+  const createStaffUser = async (userData: { teamMemberId: string; email: string; password: string; name?: string; phone?: string }) => {
+    try {
+      const created = await apiRequest<User>('/api/users/staff', {
+        method: 'POST',
+        body: JSON.stringify(userData)
+      });
+      setUsers(prev => [...prev, created]);
+      await refreshAll();
+      addToast(`Staff login credentials created for ${created.name}`);
+      return created;
+    } catch (err: any) {
+      addToast(err.message || 'Failed to create staff login', 'error');
+      throw err;
+    }
+  };
+
+  const updateUserStatus = async (id: string, status: 'ACTIVE' | 'DISABLED') => {
+    try {
+      const updated = await apiRequest<User>(`/api/users/${id}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ status })
+      });
+      setUsers(prev => prev.map(u => (u.id === id ? { ...u, status: updated.status } : u)));
+      await refreshAll();
+      addToast(`Account status updated to ${status}`);
+    } catch (err: any) {
+      addToast(err.message || 'Failed to update user status', 'error');
+      throw err;
+    }
+  };
+
+  const resetUserPassword = async (id: string, password: string) => {
+    try {
+      await apiRequest(`/api/users/${id}/password`, {
+        method: 'PUT',
+        body: JSON.stringify({ password })
+      });
+      addToast('Password has been securely reset.');
+    } catch (err: any) {
+      addToast(err.message || 'Failed to reset password', 'error');
+      throw err;
+    }
+  };
+
+  const deleteUser = async (id: string) => {
+    try {
+      await apiRequest(`/api/users/${id}`, {
+        method: 'DELETE'
+      });
+      setUsers(prev => prev.filter(u => u.id !== id));
+      await refreshAll();
+      addToast('Staff login account removed successfully.');
+    } catch (err: any) {
+      addToast(err.message || 'Failed to delete user account', 'error');
+      throw err;
+    }
+  };
+
   return (
     <StudioDataContext.Provider
       value={{
@@ -750,6 +818,7 @@ export const StudioDataProvider: React.FC<{ children: ReactNode }> = ({ children
         addToast,
         removeToast,
         profile,
+        users,
         clients,
         events,
         daySchedules,
@@ -808,7 +877,11 @@ export const StudioDataProvider: React.FC<{ children: ReactNode }> = ({ children
         deleteTask,
         createTeamPayment,
         processPayoutBatch,
-        fetchAIBriefing
+        fetchAIBriefing,
+        createStaffUser,
+        updateUserStatus,
+        resetUserPassword,
+        deleteUser
       }}
     >
       {children}

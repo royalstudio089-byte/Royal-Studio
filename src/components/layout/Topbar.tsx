@@ -131,8 +131,12 @@ export const Topbar: React.FC<TopbarProps> = ({
             {user?.role}
           </span>
           <div className="hidden sm:block text-right">
-            <div className="text-xs font-semibold text-gray-900 leading-tight">{user?.name}</div>
-            <div className="text-[10px] text-gray-500">Royal Studio PK</div>
+            <div className="text-xs font-bold text-gray-900 leading-tight">
+              {isAdmin ? 'Royal Studio' : user?.name}
+            </div>
+            <div className="text-[10px] font-semibold text-amber-700">
+              {isAdmin ? 'Administrator • Active' : 'Staff • Active'}
+            </div>
           </div>
         </div>
       </div>

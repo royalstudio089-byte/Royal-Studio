@@ -1,5 +1,7 @@
 export type Role = 'ADMIN' | 'STAFF';
 
+export type UserStatus = 'ACTIVE' | 'DISABLED';
+
 export interface User {
   id: string;
   name: string;
@@ -8,6 +10,9 @@ export interface User {
   phone: string;
   avatar?: string;
   password?: string;
+  status: UserStatus;
+  linkedTeamMemberId?: string;
+  createdDate?: string;
 }
 
 export interface Client {
@@ -143,6 +148,9 @@ export interface TeamMember {
   isActive: boolean;
   joiningDate: string;
   notes: string;
+  hasLogin?: boolean;
+  userId?: string;
+  loginStatus?: UserStatus;
 }
 
 export type AssignmentStatus = 'Assigned' | 'Confirmed' | 'Completed' | 'Cancelled';

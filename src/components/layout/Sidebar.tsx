@@ -188,8 +188,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
             {!isCollapsed && (
               <div className="min-w-0">
-                <div className="text-xs font-medium text-white truncate">{user?.name}</div>
-                <div className="text-[10px] text-slate-400 truncate">{user?.email}</div>
+                <div className="text-xs font-bold text-white truncate">
+                  {isAdmin ? 'Royal Studio' : user?.name}
+                </div>
+                <div className="text-[10px] text-amber-400 font-medium truncate">
+                  {isAdmin ? 'Administrator • Active' : user?.email}
+                </div>
               </div>
             )}
           </div>

@@ -414,7 +414,7 @@ export const EventDetailPage: React.FC<EventDetailPageProps> = ({ eventId, navig
       paymentTerms: profile?.paymentTerms || '',
       notes: '',
       status: event.remainingBalance === 0 ? 'Paid' : 'Partially Paid',
-      createdBy: 'admin'
+      createdBy: 'Royal Studio'
     };
 
     if (client && profile) {
@@ -437,7 +437,7 @@ export const EventDetailPage: React.FC<EventDetailPageProps> = ({ eventId, navig
       total: event.packagePrice - event.discount + event.tax,
       paymentTerms: profile?.paymentTerms || '',
       notes: '',
-      createdBy: 'admin'
+      createdBy: 'Royal Studio'
     };
 
     if (client && profile) {
@@ -2230,7 +2230,7 @@ export const EventDetailPage: React.FC<EventDetailPageProps> = ({ eventId, navig
             paymentTerms: profile?.paymentTerms || 'Bank Transfer / Cash / JazzCash',
             notes: `Invoice for ${event.title}`,
             status: event.remainingBalance === 0 ? 'Paid' : (event.totalClientPayments > 0 ? 'Partially Paid' : 'Unpaid'),
-            createdBy: 'admin'
+            createdBy: 'Royal Studio'
           }}
           quotation={eventQuotations[0] || {
             id: 'quo-preview',
@@ -2245,7 +2245,7 @@ export const EventDetailPage: React.FC<EventDetailPageProps> = ({ eventId, navig
             total: event.packagePrice - (event.discount || 0) + (event.tax || 0),
             paymentTerms: profile?.paymentTerms || '50% advance to confirm booking',
             notes: `Official quotation proposal for ${event.title}`,
-            createdBy: 'admin'
+            createdBy: 'Royal Studio'
           }}
           event={event}
           client={client}

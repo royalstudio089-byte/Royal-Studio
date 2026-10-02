@@ -45,24 +45,30 @@ export interface DatabaseSchema {
   tempHireRecommendations: TempHireRecommendation[];
 }
 
-const DATA_DIR = path.resolve(process.cwd(), 'data');
+const DATA_DIR = process.env.VERCEL ? path.join('/tmp', 'data') : path.resolve(process.cwd(), 'data');
 const DB_FILE = path.join(DATA_DIR, 'studio_db.json');
 
 function ensureDirectoryExists() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+  } catch (err) {
+    console.warn('Could not create DATA_DIR:', err);
   }
 }
 
 function getInitialData(): DatabaseSchema {
   const adminUser: User = {
     id: 'usr-admin',
-    name: 'M. Bilal Khan',
+    name: 'Royal Studio',
     email: 'admin@royalstudio.pk',
     role: 'ADMIN',
-    phone: '+92 300 8472911',
+    status: 'ACTIVE',
+    phone: '+92 308 4877073',
     password: 'admin123',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+    createdDate: '2026-01-01T00:00:00.000Z'
   };
 
   const staffUser: User = {
@@ -70,9 +76,12 @@ function getInitialData(): DatabaseSchema {
     name: 'Hamza Tariq',
     email: 'staff@royalstudio.pk',
     role: 'STAFF',
+    status: 'ACTIVE',
+    linkedTeamMemberId: 'tm-001',
     phone: '+92 321 4455667',
     password: 'staff123',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80'
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
+    createdDate: '2026-01-15T00:00:00.000Z'
   };
 
   const profile: AdminProfile = {
@@ -754,7 +763,7 @@ function getInitialData(): DatabaseSchema {
       description: 'Dinner & refreshments for 5 crew members for 3 event days',
       amount: 15500,
       date: '2026-10-15',
-      paidBy: 'M. Bilal Khan',
+      paidBy: 'Royal Studio',
       notes: 'Dinner at PC and venue lounge'
     },
     {
@@ -1060,14 +1069,86 @@ export class StudioDatabase {
         this.save();
       }
     } else {
-      this.db = getInitialData();
+      const seedFile = path.resolve(process.cwd(), 'data', 'studio_db.json');
+      if (fs.existsSync(seedFile)) {
+        try {
+          const raw = fs.readFileSync(seedFile, 'utf-8');
+          this.db = JSON.parse(raw);
+        } catch {
+          this.db = getInitialData();
+        }
+      } else {
+        this.db = getInitialData();
+      }
+      this.save();
+    }
+
+    // Ensure Admin identity is always Royal Studio and not M. Bilal Khan
+    let needsSave = false;
+    const admin = this.db.users?.find(u => u.role === 'ADMIN');
+    if (admin) {
+      if (admin.name === 'M. Bilal Khan' || !admin.name) {
+        admin.name = 'Royal Studio';
+        needsSave = true;
+      }
+      if (!admin.status) {
+        admin.status = 'ACTIVE';
+        needsSave = true;
+      }
+    }
+
+    // Ensure all users have status and staff linking
+    this.db.users?.forEach(u => {
+      if (!u.status) {
+        u.status = 'ACTIVE';
+        needsSave = true;
+      }
+      if (u.role === 'STAFF' && !u.linkedTeamMemberId && u.name === 'Hamza Tariq') {
+        u.linkedTeamMemberId = 'tm-001';
+        needsSave = true;
+      }
+    });
+
+    // Sync team member login status with user accounts
+    this.db.teamMembers?.forEach(tm => {
+      const linkedUser = this.db.users?.find(u => u.linkedTeamMemberId === tm.id || u.id === tm.userId);
+      if (linkedUser) {
+        if (!tm.hasLogin || tm.userId !== linkedUser.id || tm.loginStatus !== linkedUser.status) {
+          tm.hasLogin = true;
+          tm.userId = linkedUser.id;
+          tm.loginStatus = linkedUser.status;
+          needsSave = true;
+        }
+      } else {
+        if (tm.hasLogin || tm.userId || tm.loginStatus) {
+          tm.hasLogin = false;
+          delete tm.userId;
+          delete tm.loginStatus;
+          needsSave = true;
+        }
+      }
+    });
+
+    // Replace any legacy M. Bilal Khan in eventExpenses
+    this.db.eventExpenses?.forEach(exp => {
+      if (exp.paidBy === 'M. Bilal Khan') {
+        exp.paidBy = 'Royal Studio';
+        needsSave = true;
+      }
+    });
+
+    if (needsSave) {
       this.save();
     }
   }
 
   public save() {
-    ensureDirectoryExists();
-    fs.writeFileSync(DB_FILE, JSON.stringify(this.db, null, 2), 'utf-8');
+    try {
+      ensureDirectoryExists();
+      fs.writeFileSync(DB_FILE, JSON.stringify(this.db, null, 2), 'utf-8');
+    } catch (err) {
+      console.warn('Could not persist to local DB_FILE:', err);
+    }
   }
 
   public getData(): DatabaseSchema {

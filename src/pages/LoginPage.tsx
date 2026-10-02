@@ -130,8 +130,8 @@ export const LoginPage: React.FC = () => {
                 <Shield className="w-3.5 h-3.5" />
                 <span>Admin Login</span>
               </div>
-              <div className="text-[11px] text-slate-300">M. Bilal Khan</div>
-              <div className="text-[10px] text-slate-500">Full System Access</div>
+              <div className="text-[11px] font-bold text-slate-100">Royal Studio</div>
+              <div className="text-[10px] text-amber-400/90 font-medium">Administrator • Active</div>
             </button>
 
             <button

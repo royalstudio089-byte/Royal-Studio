@@ -67,6 +67,11 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
     return;
   }
 
+  if (user.status === 'DISABLED') {
+    res.status(403).json({ error: 'This user account has been disabled. Please contact the Royal Studio Administrator.' });
+    return;
+  }
+
   // 30 days token expiry or 30 min idle handled in frontend
   const token = `token-${user.id}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   sessions.set(token, {
@@ -97,21 +102,186 @@ app.post('/api/auth/logout', (req: Request, res: Response) => {
   res.json({ success: true });
 });
 
+// ================= USER & STAFF ACCOUNT MANAGEMENT ================= //
+// List all user accounts (Admin only)
+app.get('/api/users', requireAuth, requireAdmin, (_req: Request, res: Response) => {
+  const db = dbInstance.getData();
+  const safeUsers = db.users.map(({ password: _, ...u }) => u);
+  res.json(safeUsers);
+});
+
+// Create Staff Login for a Team Member (Admin only)
+app.post('/api/users/staff', requireAuth, requireAdmin, (req: Request, res: Response) => {
+  const { teamMemberId, email, password, name, phone } = req.body;
+  const db = dbInstance.getData();
+
+  if (!teamMemberId || !email || !password) {
+    res.status(400).json({ error: 'Team member, email, and password are required.' });
+    return;
+  }
+
+  const cleanEmail = String(email).toLowerCase().trim();
+  if (db.users.some(u => u.email.toLowerCase() === cleanEmail)) {
+    res.status(400).json({ error: 'A login account with this email address already exists.' });
+    return;
+  }
+
+  const teamMember = db.teamMembers.find(t => t.id === teamMemberId);
+  if (!teamMember) {
+    res.status(404).json({ error: 'Target team member not found.' });
+    return;
+  }
+
+  const newUser: User = {
+    id: `usr-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+    name: name || teamMember.name,
+    email: cleanEmail,
+    role: 'STAFF',
+    status: 'ACTIVE',
+    linkedTeamMemberId: teamMember.id,
+    phone: phone || teamMember.phone,
+    password: String(password),
+    createdDate: new Date().toISOString()
+  };
+
+  db.users.push(newUser);
+  teamMember.hasLogin = true;
+  teamMember.userId = newUser.id;
+  teamMember.loginStatus = 'ACTIVE';
+  dbInstance.save();
+
+  const { password: _, ...safeUser } = newUser;
+  res.status(201).json(safeUser);
+});
+
+// Update User Account Status (Enable / Disable)
+app.put('/api/users/:id/status', requireAuth, requireAdmin, (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  const db = dbInstance.getData();
+
+  const user = db.users.find(u => u.id === id);
+  if (!user) {
+    res.status(404).json({ error: 'User not found.' });
+    return;
+  }
+
+  if (user.role === 'ADMIN' && status === 'DISABLED') {
+    res.status(400).json({ error: 'The primary Royal Studio Administrator account cannot be disabled.' });
+    return;
+  }
+
+  user.status = status === 'DISABLED' ? 'DISABLED' : 'ACTIVE';
+
+  // Invalidate active session if disabled
+  if (user.status === 'DISABLED') {
+    for (const [token, session] of sessions.entries()) {
+      if (session.userId === user.id) {
+        sessions.delete(token);
+      }
+    }
+  }
+
+  // Sync team member login status if linked
+  if (user.linkedTeamMemberId) {
+    const tm = db.teamMembers.find(t => t.id === user.linkedTeamMemberId);
+    if (tm) {
+      tm.loginStatus = user.status;
+    }
+  }
+
+  dbInstance.save();
+  const { password: _, ...safeUser } = user;
+  res.json(safeUser);
+});
+
+// Reset / Change User Password
+app.put('/api/users/:id/password', requireAuth, requireAdmin, (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { password } = req.body;
+
+  if (!password || String(password).trim().length < 4) {
+    res.status(400).json({ error: 'Password must be at least 4 characters long.' });
+    return;
+  }
+
+  const db = dbInstance.getData();
+  const user = db.users.find(u => u.id === id);
+  if (!user) {
+    res.status(404).json({ error: 'User not found.' });
+    return;
+  }
+
+  user.password = String(password).trim();
+  dbInstance.save();
+  res.json({ success: true, message: `Password updated successfully for ${user.name}` });
+});
+
+// Delete Staff Login Account
+app.delete('/api/users/:id', requireAuth, requireAdmin, (req: Request, res: Response) => {
+  const { id } = req.params;
+  const db = dbInstance.getData();
+
+  const userIdx = db.users.findIndex(u => u.id === id);
+  if (userIdx === -1) {
+    res.status(404).json({ error: 'User not found.' });
+    return;
+  }
+
+  if (db.users[userIdx].role === 'ADMIN') {
+    res.status(400).json({ error: 'Cannot delete the primary Royal Studio Administrator account.' });
+    return;
+  }
+
+  const deletedUser = db.users.splice(userIdx, 1)[0];
+
+  // Invalidate any sessions
+  for (const [token, session] of sessions.entries()) {
+    if (session.userId === deletedUser.id) {
+      sessions.delete(token);
+    }
+  }
+
+  // Unlink team member
+  if (deletedUser.linkedTeamMemberId) {
+    const tm = db.teamMembers.find(t => t.id === deletedUser.linkedTeamMemberId);
+    if (tm) {
+      tm.hasLogin = false;
+      delete tm.userId;
+      delete tm.loginStatus;
+    }
+  }
+
+  dbInstance.save();
+  res.json({ success: true, message: 'User account removed.' });
+});
+
 // ================= ALL DATA FETCH ================= //
 app.get('/api/db/all', requireAuth, (req: Request, res: Response) => {
   const user = (req as any).user as User;
   const db = dbInstance.getData();
 
-  // If staff, omit studio expenses and sensitive payroll administration
   const isStaff = user.role === 'STAFF';
+
+  // Enrich team members with login relation info
+  const enrichedTeamMembers = db.teamMembers.map(tm => {
+    const linkedUser = db.users.find(u => u.linkedTeamMemberId === tm.id || (u.role === 'STAFF' && u.name.toLowerCase() === tm.name.toLowerCase()));
+    return {
+      ...tm,
+      hasLogin: !!linkedUser,
+      userId: linkedUser?.id,
+      loginStatus: linkedUser?.status || (linkedUser ? 'ACTIVE' : undefined)
+    };
+  });
 
   res.json({
     profile: db.profile,
+    users: isStaff ? [] : db.users.map(({ password: _, ...u }) => u),
     clients: db.clients,
     events: db.events,
     daySchedules: db.daySchedules,
     packages: db.packages,
-    teamMembers: db.teamMembers,
+    teamMembers: enrichedTeamMembers,
     teamAssignments: db.teamAssignments,
     teamPayments: isStaff ? [] : db.teamPayments,
     equipment: db.equipment,
@@ -1379,4 +1549,8 @@ async function startServer() {
   });
 }
 
-startServer();
+if (!process.env.VERCEL) {
+  startServer();
+}
+
+export default app;
