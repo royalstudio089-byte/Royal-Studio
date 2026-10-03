@@ -63,21 +63,23 @@ export const TeamPaymentsPage: React.FC<TeamPaymentsPageProps> = ({ navigate }) 
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => navigate('/payout-batch')}
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-300 text-gray-800 rounded-xl text-xs font-semibold hover:bg-gray-50 transition-colors shadow-xs"
-          >
-            <Layers className="w-4 h-4 text-amber-600" />
-            <span>Process Batch Payout</span>
-          </button>
           {isAdmin && (
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold transition-colors shadow-xs"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Record Crew Payment</span>
-            </button>
+            <>
+              <button
+                onClick={() => navigate('/payout-batch')}
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-300 text-gray-800 rounded-xl text-xs font-semibold hover:bg-gray-50 transition-colors shadow-xs"
+              >
+                <Layers className="w-4 h-4 text-amber-600" />
+                <span>Process Batch Payout</span>
+              </button>
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold transition-colors shadow-xs"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Record Crew Payment</span>
+              </button>
+            </>
           )}
         </div>
       </div>

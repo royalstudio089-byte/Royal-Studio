@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
+import { Footer } from './Footer';
 import { ToastContainer } from '../common/ToastContainer';
 import { X } from 'lucide-react';
 
@@ -57,9 +58,10 @@ export const AppShell: React.FC<AppShellProps> = ({ currentPath, navigate, child
           navigate={navigate}
         />
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-8">
-          <div className="max-w-7xl mx-auto space-y-6">
+        <main className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col justify-between">
+          <div className="max-w-7xl mx-auto space-y-6 w-full flex-1">
             {children}
+            <Footer />
           </div>
         </main>
       </div>

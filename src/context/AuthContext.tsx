@@ -9,7 +9,6 @@ interface AuthContextType {
   isStaff: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  switchAccount: (role: Role) => Promise<void>;
   idleRemainingSeconds: number;
 }
 
@@ -122,14 +121,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const switchAccount = async (targetRole: Role) => {
-    if (targetRole === 'ADMIN') {
-      await login('admin@royalstudio.pk', 'admin123');
-    } else {
-      await login('staff@royalstudio.pk', 'staff123');
-    }
-  };
-
   const isAdmin = user?.role === 'ADMIN';
   const isStaff = user?.role === 'STAFF';
 
@@ -142,7 +133,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         isStaff,
         login,
         logout,
-        switchAccount,
         idleRemainingSeconds
       }}
     >

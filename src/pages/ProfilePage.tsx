@@ -34,18 +34,22 @@ export const ProfilePage: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'SETTINGS' | 'USERS'>('SETTINGS');
 
-  const [studioName, setStudioName] = useState(profile?.studioName || 'ROYAL STUDIO');
-  const [tagline, setTagline] = useState(profile?.tagline || 'Premier Visuals & Cinema Management');
-  const [address, setAddress] = useState(profile?.address || 'Plot 42-B, Main Boulevard, Gulberg III');
-  const [city, setCity] = useState(profile?.city || 'Lahore, Pakistan');
-  const [phone, setPhone] = useState(profile?.phone || '+92 300 1234567');
-  const [whatsapp, setWhatsapp] = useState(profile?.whatsapp || '+92 321 7654321');
+  const [studioName, setStudioName] = useState(profile?.studioName || 'Royal Studio');
+  const [tagline, setTagline] = useState(profile?.tagline || 'Luxury wedding photography, cinematic films, and brand shoots.');
+  const [description, setDescription] = useState(profile?.description || profile?.tagline || 'Luxury wedding photography, cinematic films, and brand shoots.');
+  const [address, setAddress] = useState(profile?.address || 'Al Jannat Town Entrance, Canal Bungalow Road, Opposite Habib Mall, Burewala, Punjab 61010, Pakistan');
+  const [city, setCity] = useState(profile?.city || 'Burewala, Punjab, Pakistan');
+  const [phone, setPhone] = useState(profile?.phone || '0308-4877073');
+  const [phone2, setPhone2] = useState(profile?.phone2 || '0303-2213806');
+  const [whatsapp, setWhatsapp] = useState(profile?.whatsapp || '0308-4877073');
   const [email, setEmail] = useState(profile?.email || 'royalstudio089@gmail.com');
-  const [website, setWebsite] = useState(profile?.website || 'https://royalstudio.pk');
-  const [instagram, setInstagram] = useState(profile?.instagram || '@royalstudiopak');
-  const [facebook, setFacebook] = useState(profile?.facebook || 'royalstudiopak');
+  const [website, setWebsite] = useState(profile?.website || 'https://royalstudio.online');
+  const [instagram, setInstagram] = useState(profile?.instagram || 'https://www.instagram.com/royalstudio089');
+  const [facebook, setFacebook] = useState(profile?.facebook || 'https://www.facebook.com/royalstudio089');
+  const [youtube, setYoutube] = useState(profile?.youtube || 'https://www.youtube.com/@royalstudio089');
+  const [googleMapsUrl, setGoogleMapsUrl] = useState(profile?.googleMapsUrl || 'https://maps.app.goo.gl/mQPek7wm4nCVjy8o9');
   const [bankName, setBankName] = useState(profile?.bankName || 'Meezan Bank Ltd');
-  const [accountTitle, setAccountTitle] = useState(profile?.accountTitle || 'Royal Visual Studios PVT Ltd');
+  const [accountTitle, setAccountTitle] = useState(profile?.accountTitle || 'Royal Studio');
   const [accountNumber, setAccountNumber] = useState(profile?.accountNumber || '02010103456789');
   const [iban, setIban] = useState(profile?.iban || 'PK45MEZN0002010103456789');
   const [taxRate, setTaxRate] = useState(profile?.taxRate || 5);
@@ -53,7 +57,7 @@ export const ProfilePage: React.FC = () => {
   const [quotationPrefix, setQuotationPrefix] = useState(profile?.quotationPrefix || 'RS-QUO-');
   const [invoicePrefix, setInvoicePrefix] = useState(profile?.invoicePrefix || 'RS-INV-');
   const [paymentTerms, setPaymentTerms] = useState(
-    profile?.paymentTerms || '50% Advance at booking, 30% on event date, 20% on final deliverable handover.'
+    profile?.paymentTerms || '50% Advance at booking, 30% on main event date, 20% on final deliverable handover.'
   );
 
   const [isSaving, setIsSaving] = useState(false);
@@ -80,14 +84,18 @@ export const ProfilePage: React.FC = () => {
       await updateProfile({
         studioName,
         tagline,
+        description,
         address,
         city,
         phone,
+        phone2,
         whatsapp,
         email,
         website,
         instagram,
         facebook,
+        youtube,
+        googleMapsUrl,
         bankName,
         accountTitle,
         accountNumber,
@@ -192,22 +200,36 @@ export const ProfilePage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Tagline</label>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Business Description / Tagline</label>
                 <input
                   type="text"
-                  value={tagline}
-                  onChange={e => setTagline(e.target.value)}
+                  value={description}
+                  onChange={e => {
+                    setDescription(e.target.value);
+                    setTagline(e.target.value);
+                  }}
                   disabled={!isAdmin}
                   className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-xs"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Phone</label>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Primary Phone</label>
                 <input
                   type="text"
                   value={phone}
                   onChange={e => setPhone(e.target.value)}
+                  disabled={!isAdmin}
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Secondary Phone</label>
+                <input
+                  type="text"
+                  value={phone2}
+                  onChange={e => setPhone2(e.target.value)}
                   disabled={!isAdmin}
                   className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-xs"
                 />
@@ -236,7 +258,7 @@ export const ProfilePage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Website</label>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Website URL</label>
                 <input
                   type="text"
                   value={website}
@@ -247,7 +269,18 @@ export const ProfilePage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Address</label>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">City / Region</label>
+                <input
+                  type="text"
+                  value={city}
+                  onChange={e => setCity(e.target.value)}
+                  disabled={!isAdmin}
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-xs"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Full Studio Address</label>
                 <input
                   type="text"
                   value={address}
@@ -257,15 +290,97 @@ export const ProfilePage: React.FC = () => {
                 />
               </div>
 
+              {/* Social Media & Google Maps */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">City</label>
-                <input
-                  type="text"
-                  value={city}
-                  onChange={e => setCity(e.target.value)}
-                  disabled={!isAdmin}
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-xs"
-                />
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Facebook URL</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={facebook}
+                    onChange={e => setFacebook(e.target.value)}
+                    disabled={!isAdmin}
+                    className="flex-1 px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-xs"
+                  />
+                  {facebook && (
+                    <a
+                      href={facebook.startsWith('http') ? facebook : `https://${facebook}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2.5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-semibold shrink-0"
+                    >
+                      Visit
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Instagram URL</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={instagram}
+                    onChange={e => setInstagram(e.target.value)}
+                    disabled={!isAdmin}
+                    className="flex-1 px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-xs"
+                  />
+                  {instagram && (
+                    <a
+                      href={instagram.startsWith('http') ? instagram : `https://${instagram}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2.5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-semibold shrink-0"
+                    >
+                      Visit
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">YouTube URL</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={youtube}
+                    onChange={e => setYoutube(e.target.value)}
+                    disabled={!isAdmin}
+                    className="flex-1 px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-xs"
+                  />
+                  {youtube && (
+                    <a
+                      href={youtube.startsWith('http') ? youtube : `https://${youtube}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2.5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-semibold shrink-0"
+                    >
+                      Visit
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Google Maps Location Link</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={googleMapsUrl}
+                    onChange={e => setGoogleMapsUrl(e.target.value)}
+                    disabled={!isAdmin}
+                    className="flex-1 px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-xs"
+                  />
+                  {googleMapsUrl && (
+                    <a
+                      href={googleMapsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-lg text-xs font-bold shrink-0 flex items-center gap-1"
+                    >
+                      Open Map
+                    </a>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -403,15 +518,15 @@ export const ProfilePage: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="font-extrabold text-base text-gray-900 leading-tight">
-                    Royal Studio — Administrator
+                    Royal Studio
                   </h3>
                   <div className="text-xs font-semibold text-amber-700 mt-0.5">
-                    Studio Business / Admin Account
+                    Administrator
                   </div>
                 </div>
               </div>
               <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold rounded-full">
-                Status: ACTIVE
+                Active
               </span>
             </div>
 

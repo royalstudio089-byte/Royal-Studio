@@ -20,6 +20,7 @@ import { CalendarPage } from './pages/CalendarPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { LoadingState } from './components/common/LoadingState';
+import { ShieldAlert } from 'lucide-react';
 
 const MainContent: React.FC = () => {
   const { user, isLoading: isAuthLoading, isAdmin } = useAuth();
@@ -61,11 +62,33 @@ const MainContent: React.FC = () => {
       return <LoadingState message="Loading studio database..." />;
     }
 
+    const renderRestricted = (moduleName: string) => (
+      <div className="p-8 bg-white rounded-2xl border border-gray-200 text-center max-w-md mx-auto my-12 space-y-3 shadow-xs">
+        <div className="w-12 h-12 rounded-full bg-rose-50 text-rose-600 mx-auto flex items-center justify-center font-bold">
+          <ShieldAlert className="w-6 h-6" />
+        </div>
+        <h3 className="text-base font-bold text-gray-900">{moduleName} Restricted</h3>
+        <p className="text-xs text-gray-500 leading-relaxed">
+          Access to this business management section is restricted to Royal Studio Administrator accounts.
+        </p>
+        <button
+          onClick={() => navigate('/tasks')}
+          className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
+        >
+          Go to My Tasks
+        </button>
+      </div>
+    );
+
     if (currentPath === '/' || currentPath === '/dashboard') {
+      if (!isAdmin) {
+        return <TasksPage navigate={navigate} />;
+      }
       return <DashboardPage navigate={navigate} />;
     }
 
     if (currentPath === '/finance') {
+      if (!isAdmin) return renderRestricted('Financial Performance & Margins');
       return <FinancePage navigate={navigate} />;
     }
 
@@ -84,58 +107,41 @@ const MainContent: React.FC = () => {
     }
 
     if (currentPath === '/clients') {
+      if (!isAdmin) return renderRestricted('Client Directory & CRM');
       return <ClientsPage navigate={navigate} />;
     }
 
     if (currentPath === '/team') {
+      if (!isAdmin) return renderRestricted('Production Team & Crew Management');
       return <TeamPage navigate={navigate} />;
     }
 
     if (currentPath === '/equipment') {
+      if (!isAdmin) return renderRestricted('Gear Locker & Equipment Master');
       return <EquipmentPage navigate={navigate} />;
     }
 
     if (currentPath === '/packages') {
+      if (!isAdmin) return renderRestricted('Package Services Master');
       return <PackagesPage navigate={navigate} />;
     }
 
     if (currentPath === '/invoices') {
+      if (!isAdmin) return renderRestricted('Invoices & Client Billing');
       return <InvoicesPage navigate={navigate} />;
     }
 
     if (currentPath === '/team-payments') {
-      if (!isAdmin) {
-        return (
-          <div className="p-8 bg-white rounded-xl border border-gray-200 text-center">
-            <h3 className="text-base font-bold text-gray-900">Restricted Section</h3>
-            <p className="text-xs text-gray-500 mt-1">Crew payroll administration is restricted to studio owners.</p>
-          </div>
-        );
-      }
       return <TeamPaymentsPage navigate={navigate} />;
     }
 
     if (currentPath === '/payout-batch') {
-      if (!isAdmin) {
-        return (
-          <div className="p-8 bg-white rounded-xl border border-gray-200 text-center">
-            <h3 className="text-base font-bold text-gray-900">Restricted Section</h3>
-            <p className="text-xs text-gray-500 mt-1">Batch payout disbursement is restricted to studio owners.</p>
-          </div>
-        );
-      }
+      if (!isAdmin) return renderRestricted('Batch Crew Payout');
       return <PayoutBatchPage navigate={navigate} />;
     }
 
     if (currentPath === '/studio-expenses') {
-      if (!isAdmin) {
-        return (
-          <div className="p-8 bg-white rounded-xl border border-gray-200 text-center">
-            <h3 className="text-base font-bold text-gray-900">Restricted Section</h3>
-            <p className="text-xs text-gray-500 mt-1">Studio overheads management is restricted to studio directors.</p>
-          </div>
-        );
-      }
+      if (!isAdmin) return renderRestricted('Studio Overhead Expenses');
       return <StudioExpensesPage navigate={navigate} />;
     }
 
@@ -144,6 +150,7 @@ const MainContent: React.FC = () => {
     }
 
     if (currentPath === '/reports') {
+      if (!isAdmin) return renderRestricted('Financial Reports & Analytics');
       return <ReportsPage />;
     }
 
@@ -152,7 +159,7 @@ const MainContent: React.FC = () => {
     }
 
     // Default fallback
-    return <DashboardPage navigate={navigate} />;
+    return isAdmin ? <DashboardPage navigate={navigate} /> : <TasksPage navigate={navigate} />;
   };
 
   return (

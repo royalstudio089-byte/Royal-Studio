@@ -353,15 +353,19 @@ export interface TeamPayment {
 export interface AdminProfile {
   studioName: string;
   tagline: string;
+  description?: string;
   logo: string;
   address: string;
   city: string;
   phone: string;
+  phone2?: string;
   whatsapp: string;
   email: string;
   website: string;
   instagram: string;
   facebook: string;
+  youtube?: string;
+  googleMapsUrl?: string;
   bankName: string;
   accountTitle: string;
   accountNumber: string;

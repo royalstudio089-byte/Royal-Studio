@@ -55,15 +55,23 @@ function requireAdmin(req: Request, res: Response, next: NextFunction) {
 
 // ================= AUTH ROUTES ================= //
 app.post('/api/auth/login', (req: Request, res: Response) => {
-  const { email, password } = req.body;
+  const { email, username, password } = req.body;
   const db = dbInstance.getData();
 
+  const identifier = ((email || username || '') as string).toLowerCase().trim();
+  const inputPassword = (password || '').trim();
+
+  if (!identifier || !inputPassword) {
+    res.status(400).json({ error: 'Email / Username and Password are required.' });
+    return;
+  }
+
   const user = db.users.find(
-    u => u.email.toLowerCase() === (email || '').toLowerCase().trim()
+    u => u.email.toLowerCase() === identifier || u.name.toLowerCase() === identifier || (u.id && u.id.toLowerCase() === identifier)
   );
 
-  if (!user || user.password !== password) {
-    res.status(401).json({ error: 'Invalid email or password' });
+  if (!user || user.password !== inputPassword) {
+    res.status(401).json({ error: 'Invalid email / username or password.' });
     return;
   }
 
@@ -72,7 +80,7 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
     return;
   }
 
-  // 30 days token expiry or 30 min idle handled in frontend
+  // Generate secure session token
   const token = `token-${user.id}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   sessions.set(token, {
     userId: user.id,
@@ -263,7 +271,82 @@ app.get('/api/db/all', requireAuth, (req: Request, res: Response) => {
 
   const isStaff = user.role === 'STAFF';
 
-  // Enrich team members with login relation info
+  if (isStaff) {
+    const linkedTm = db.teamMembers.find(
+      tm => tm.id === user.linkedTeamMemberId || tm.name.toLowerCase() === user.name.toLowerCase()
+    );
+    const staffTmId = linkedTm?.id;
+
+    // Filter assignments for this staff
+    const myAssignments = staffTmId
+      ? db.teamAssignments.filter(a => a.teamMemberId === staffTmId)
+      : [];
+    const myEventIds = new Set(myAssignments.map(a => a.eventId));
+
+    // Filter events where this staff is assigned, and strip all financial figures
+    const myEvents = db.events
+      .filter(e => myEventIds.has(e.id))
+      .map(e => ({
+        ...e,
+        packagePrice: 0,
+        advancePaid: 0,
+        discount: 0,
+        tax: 0,
+        staffCost: 0,
+        rentalCost: 0,
+        eventExpenses: 0,
+        netProfit: 0,
+        netMargin: 0,
+        totalClientPayments: 0,
+        remainingBalance: 0
+      }));
+
+    // Filter day schedules for these events
+    const myDaySchedules = db.daySchedules.filter(ds => myEventIds.has(ds.eventId));
+
+    // Filter tasks assigned to this staff
+    const myTasks = db.tasks.filter(
+      t => (staffTmId && t.assigneeId === staffTmId) ||
+           (user.linkedTeamMemberId && t.assigneeId === user.linkedTeamMemberId)
+    );
+
+    // Filter payments for this staff member
+    const myPayments = staffTmId
+      ? db.teamPayments.filter(p => p.teamMemberId === staffTmId)
+      : [];
+
+    // Filter equipment assigned to these events
+    const myEquipmentAssignments = db.equipmentAssignments.filter(ea => myEventIds.has(ea.eventId));
+    const myEquipmentIds = new Set(myEquipmentAssignments.map(ea => ea.equipmentId));
+    const myEquipment = db.equipment.filter(eq => myEquipmentIds.has(eq.id)).map(eq => ({
+      ...eq,
+      rentalRate: 0 // Strip financial rate
+    }));
+
+    return res.json({
+      profile: db.profile,
+      users: [],
+      clients: [],
+      events: myEvents,
+      daySchedules: myDaySchedules,
+      packages: [],
+      teamMembers: linkedTm ? [{ ...linkedTm, dailyRate: 0, eventRate: 0 }] : [],
+      teamAssignments: myAssignments,
+      teamPayments: myPayments,
+      equipment: myEquipment,
+      equipmentAssignments: myEquipmentAssignments,
+      maintenanceLogs: [],
+      eventExpenses: [],
+      studioExpenses: [],
+      invoices: [],
+      payments: [],
+      quotations: [],
+      tasks: myTasks,
+      tempHireRecommendations: []
+    });
+  }
+
+  // Admin access: Full database returned
   const enrichedTeamMembers = db.teamMembers.map(tm => {
     const linkedUser = db.users.find(u => u.linkedTeamMemberId === tm.id || (u.role === 'STAFF' && u.name.toLowerCase() === tm.name.toLowerCase()));
     return {
@@ -276,19 +359,19 @@ app.get('/api/db/all', requireAuth, (req: Request, res: Response) => {
 
   res.json({
     profile: db.profile,
-    users: isStaff ? [] : db.users.map(({ password: _, ...u }) => u),
+    users: db.users.map(({ password: _, ...u }) => u),
     clients: db.clients,
     events: db.events,
     daySchedules: db.daySchedules,
     packages: db.packages,
     teamMembers: enrichedTeamMembers,
     teamAssignments: db.teamAssignments,
-    teamPayments: isStaff ? [] : db.teamPayments,
+    teamPayments: db.teamPayments,
     equipment: db.equipment,
     equipmentAssignments: db.equipmentAssignments,
     maintenanceLogs: db.maintenanceLogs,
     eventExpenses: db.eventExpenses,
-    studioExpenses: isStaff ? [] : db.studioExpenses,
+    studioExpenses: db.studioExpenses,
     invoices: db.invoices,
     payments: db.payments,
     quotations: db.quotations,
@@ -298,6 +381,11 @@ app.get('/api/db/all', requireAuth, (req: Request, res: Response) => {
 });
 
 // ================= PROFILE / STUDIO SETTINGS ================= //
+app.get('/api/profile', (_req: Request, res: Response) => {
+  const db = dbInstance.getData();
+  res.json(db.profile);
+});
+
 app.put('/api/profile', requireAuth, requireAdmin, (req: Request, res: Response) => {
   const db = dbInstance.getData();
   db.profile = { ...db.profile, ...req.body };
@@ -306,7 +394,7 @@ app.put('/api/profile', requireAuth, requireAdmin, (req: Request, res: Response)
 });
 
 // ================= CLIENTS ================= //
-app.post('/api/clients', requireAuth, (req: Request, res: Response) => {
+app.post('/api/clients', requireAuth, requireAdmin, (req: Request, res: Response) => {
   const user = (req as any).user as User;
   const db = dbInstance.getData();
   const { name, phone, whatsapp, email, address, city, notes } = req.body;
@@ -341,7 +429,7 @@ app.post('/api/clients', requireAuth, (req: Request, res: Response) => {
   res.json(newClient);
 });
 
-app.put('/api/clients/:id', requireAuth, (req: Request, res: Response) => {
+app.put('/api/clients/:id', requireAuth, requireAdmin, (req: Request, res: Response) => {
   const db = dbInstance.getData();
   const index = db.clients.findIndex(c => c.id === req.params.id);
   if (index === -1) {
@@ -371,7 +459,7 @@ app.delete('/api/clients/:id', requireAuth, requireAdmin, (req: Request, res: Re
 });
 
 // ================= EVENTS ================= //
-app.post('/api/events', requireAuth, (req: Request, res: Response) => {
+app.post('/api/events', requireAuth, requireAdmin, (req: Request, res: Response) => {
   const user = (req as any).user as User;
   const db = dbInstance.getData();
 
@@ -476,7 +564,7 @@ app.post('/api/events', requireAuth, (req: Request, res: Response) => {
   res.json(newEvent);
 });
 
-app.put('/api/events/:id', requireAuth, (req: Request, res: Response) => {
+app.put('/api/events/:id', requireAuth, requireAdmin, (req: Request, res: Response) => {
   const db = dbInstance.getData();
   const index = db.events.findIndex(e => e.id === req.params.id);
   if (index === -1) {
@@ -514,7 +602,7 @@ app.delete('/api/events/:id', requireAuth, requireAdmin, (req: Request, res: Res
   res.json({ success: true });
 });
 
-app.post('/api/events/:id/recalculate', requireAuth, (req: Request, res: Response) => {
+app.post('/api/events/:id/recalculate', requireAuth, requireAdmin, (req: Request, res: Response) => {
   const updated = dbInstance.recalculateEvent(req.params.id);
   if (!updated) {
     res.status(404).json({ error: 'Event not found' });
@@ -524,7 +612,7 @@ app.post('/api/events/:id/recalculate', requireAuth, (req: Request, res: Respons
 });
 
 // ================= AUTO TEAM ASSIGNMENT & CONFLICT ENGINE ================= //
-app.post('/api/events/:id/auto-assign', requireAuth, (req: Request, res: Response) => {
+app.post('/api/events/:id/auto-assign', requireAuth, requireAdmin, (req: Request, res: Response) => {
   const db = dbInstance.getData();
   const event = db.events.find(e => e.id === req.params.id);
   if (!event) {
@@ -654,7 +742,7 @@ app.post('/api/events/:id/auto-assign', requireAuth, (req: Request, res: Respons
 });
 
 // ================= MULTI-DAY SCHEDULES ================= //
-app.post('/api/day-schedules', requireAuth, (req: Request, res: Response) => {
+app.post('/api/day-schedules', requireAuth, requireAdmin, (req: Request, res: Response) => {
   const db = dbInstance.getData();
   const { eventId, dayNumber, date, eventType, venue, startTime, endTime, callTime, dressCode, notes, customPrice } = req.body;
 
@@ -679,7 +767,7 @@ app.post('/api/day-schedules', requireAuth, (req: Request, res: Response) => {
   res.json(newSchedule);
 });
 
-app.put('/api/day-schedules/:id', requireAuth, (req: Request, res: Response) => {
+app.put('/api/day-schedules/:id', requireAuth, requireAdmin, (req: Request, res: Response) => {
   const db = dbInstance.getData();
   const index = db.daySchedules.findIndex(d => d.id === req.params.id);
   if (index === -1) {
@@ -709,7 +797,7 @@ app.delete('/api/day-schedules/:id', requireAuth, requireAdmin, (req: Request, r
 });
 
 // ================= TEAM MEMBERS ================= //
-app.post('/api/team', requireAuth, (req: Request, res: Response) => {
+app.post('/api/team', requireAuth, requireAdmin, (req: Request, res: Response) => {
   const db = dbInstance.getData();
   const { name, phone, whatsapp, email, role, specialization, dailyRate, eventRate, availabilityStatus, notes } = req.body;
 
@@ -739,7 +827,7 @@ app.post('/api/team', requireAuth, (req: Request, res: Response) => {
   res.json(newMember);
 });
 
-app.put('/api/team/:id', requireAuth, (req: Request, res: Response) => {
+app.put('/api/team/:id', requireAuth, requireAdmin, (req: Request, res: Response) => {
   const user = (req as any).user as User;
   // Master record changes require admin
   if (user.role !== 'ADMIN') {
@@ -766,7 +854,7 @@ app.delete('/api/team/:id', requireAuth, requireAdmin, (req: Request, res: Respo
 });
 
 // ================= TEAM ASSIGNMENTS ================= //
-app.post('/api/team-assignments', requireAuth, (req: Request, res: Response) => {
+app.post('/api/team-assignments', requireAuth, requireAdmin, (req: Request, res: Response) => {
   const db = dbInstance.getData();
   const { eventId, teamMemberId, role, date, hours, rate, cost, notes, assignmentStatus } = req.body;
 
@@ -806,7 +894,7 @@ app.post('/api/team-assignments', requireAuth, (req: Request, res: Response) => 
   res.json(newAssignment);
 });
 
-app.put('/api/team-assignments/:id', requireAuth, (req: Request, res: Response) => {
+app.put('/api/team-assignments/:id', requireAuth, requireAdmin, (req: Request, res: Response) => {
   const db = dbInstance.getData();
   const index = db.teamAssignments.findIndex(a => a.id === req.params.id);
   if (index === -1) {
@@ -836,7 +924,7 @@ app.delete('/api/team-assignments/:id', requireAuth, requireAdmin, (req: Request
 });
 
 // ================= EQUIPMENT & CONFLICT DETECTION ================= //
-app.post('/api/equipment', requireAuth, (req: Request, res: Response) => {
+app.post('/api/equipment', requireAuth, requireAdmin, (req: Request, res: Response) => {
   const db = dbInstance.getData();
   const { name, category, brand, model, serialNumber, quantity, rentalRate, serviceAfterUses, notes } = req.body;
 
@@ -866,7 +954,7 @@ app.post('/api/equipment', requireAuth, (req: Request, res: Response) => {
   res.json(newEquip);
 });
 
-app.put('/api/equipment/:id', requireAuth, (req: Request, res: Response) => {
+app.put('/api/equipment/:id', requireAuth, requireAdmin, (req: Request, res: Response) => {
   const user = (req as any).user as User;
   if (user.role !== 'ADMIN') {
     res.status(403).json({ error: 'Forbidden. Only administrators can edit equipment master records.' });
@@ -892,7 +980,7 @@ app.delete('/api/equipment/:id', requireAuth, requireAdmin, (req: Request, res: 
 });
 
 // Assign Equipment with Conflict Detection (Section 18 & 19)
-app.post('/api/equipment-assignments', requireAuth, (req: Request, res: Response) => {
+app.post('/api/equipment-assignments', requireAuth, requireAdmin, (req: Request, res: Response) => {
   const db = dbInstance.getData();
   const { eventId, equipmentId, quantity, rentalRate, notes } = req.body;
 
@@ -958,7 +1046,7 @@ app.post('/api/equipment-assignments', requireAuth, (req: Request, res: Response
   res.json(newAssignment);
 });
 
-app.put('/api/equipment-assignments/:id', requireAuth, (req: Request, res: Response) => {
+app.put('/api/equipment-assignments/:id', requireAuth, requireAdmin, (req: Request, res: Response) => {
   const db = dbInstance.getData();
   const index = db.equipmentAssignments.findIndex(a => a.id === req.params.id);
   if (index === -1) {
@@ -988,7 +1076,7 @@ app.delete('/api/equipment-assignments/:id', requireAuth, requireAdmin, (req: Re
 });
 
 // Equipment Maintenance Logs
-app.post('/api/maintenance-logs', requireAuth, (req: Request, res: Response) => {
+app.post('/api/maintenance-logs', requireAuth, requireAdmin, (req: Request, res: Response) => {
   const user = (req as any).user as User;
   const db = dbInstance.getData();
   const { equipmentId, issue, description, cost, status, repairNotes } = req.body;
@@ -1017,7 +1105,7 @@ app.post('/api/maintenance-logs', requireAuth, (req: Request, res: Response) => 
 });
 
 // ================= PACKAGES ================= //
-app.post('/api/packages', requireAuth, (req: Request, res: Response) => {
+app.post('/api/packages', requireAuth, requireAdmin, (req: Request, res: Response) => {
   const user = (req as any).user as User;
   if (user.role !== 'ADMIN') {
     res.status(403).json({ error: 'Forbidden. Only administrators can create packages.' });
@@ -1047,7 +1135,7 @@ app.post('/api/packages', requireAuth, (req: Request, res: Response) => {
   res.json(newPkg);
 });
 
-app.put('/api/packages/:id', requireAuth, (req: Request, res: Response) => {
+app.put('/api/packages/:id', requireAuth, requireAdmin, (req: Request, res: Response) => {
   const user = (req as any).user as User;
   if (user.role !== 'ADMIN') {
     res.status(403).json({ error: 'Forbidden. Only administrators can edit packages.' });
@@ -1073,7 +1161,7 @@ app.delete('/api/packages/:id', requireAuth, requireAdmin, (req: Request, res: R
 });
 
 // ================= EVENT EXPENSES ================= //
-app.post('/api/expenses', requireAuth, (req: Request, res: Response) => {
+app.post('/api/expenses', requireAuth, requireAdmin, (req: Request, res: Response) => {
   const user = (req as any).user as User;
   const db = dbInstance.getData();
   const { eventId, category, description, amount, date, notes } = req.body;
@@ -1095,7 +1183,7 @@ app.post('/api/expenses', requireAuth, (req: Request, res: Response) => {
   res.json(newExp);
 });
 
-app.put('/api/expenses/:id', requireAuth, (req: Request, res: Response) => {
+app.put('/api/expenses/:id', requireAuth, requireAdmin, (req: Request, res: Response) => {
   const db = dbInstance.getData();
   const index = db.eventExpenses.findIndex(e => e.id === req.params.id);
   if (index === -1) {
@@ -1168,7 +1256,7 @@ app.delete('/api/studio-expenses/:id', requireAuth, requireAdmin, (req: Request,
 });
 
 // ================= INVOICES ================= //
-app.post('/api/invoices', requireAuth, (req: Request, res: Response) => {
+app.post('/api/invoices', requireAuth, requireAdmin, (req: Request, res: Response) => {
   const user = (req as any).user as User;
   const db = dbInstance.getData();
   const { clientId, eventId, dueDate, subtotal, discount, tax, paymentTerms, notes } = req.body;
@@ -1208,7 +1296,7 @@ app.post('/api/invoices', requireAuth, (req: Request, res: Response) => {
   res.json(newInvoice);
 });
 
-app.put('/api/invoices/:id', requireAuth, (req: Request, res: Response) => {
+app.put('/api/invoices/:id', requireAuth, requireAdmin, (req: Request, res: Response) => {
   const db = dbInstance.getData();
   const index = db.invoices.findIndex(i => i.id === req.params.id);
   if (index === -1) {
@@ -1235,7 +1323,7 @@ app.delete('/api/invoices/:id', requireAuth, requireAdmin, (req: Request, res: R
 });
 
 // ================= CLIENT PAYMENTS ================= //
-app.post('/api/payments', requireAuth, (req: Request, res: Response) => {
+app.post('/api/payments', requireAuth, requireAdmin, (req: Request, res: Response) => {
   const user = (req as any).user as User;
   const db = dbInstance.getData();
   const { eventId, invoiceId, amount, paymentDate, method, reference, notes } = req.body;
@@ -1287,7 +1375,7 @@ app.delete('/api/payments/:id', requireAuth, requireAdmin, (req: Request, res: R
 });
 
 // ================= QUOTATIONS ================= //
-app.post('/api/quotations', requireAuth, (req: Request, res: Response) => {
+app.post('/api/quotations', requireAuth, requireAdmin, (req: Request, res: Response) => {
   const user = (req as any).user as User;
   const db = dbInstance.getData();
   const { clientId, eventId, validUntil, subtotal, discount, tax, paymentTerms, notes } = req.body;
@@ -1319,7 +1407,7 @@ app.post('/api/quotations', requireAuth, (req: Request, res: Response) => {
 });
 
 // ================= TASKS ================= //
-app.post('/api/tasks', requireAuth, (req: Request, res: Response) => {
+app.post('/api/tasks', requireAuth, requireAdmin, (req: Request, res: Response) => {
   const db = dbInstance.getData();
   const { eventId, title, assigneeId, dueDate, priority, description } = req.body;
 
@@ -1346,11 +1434,30 @@ app.post('/api/tasks', requireAuth, (req: Request, res: Response) => {
 });
 
 app.put('/api/tasks/:id', requireAuth, (req: Request, res: Response) => {
+  const user = (req as any).user as User;
   const db = dbInstance.getData();
   const index = db.tasks.findIndex(t => t.id === req.params.id);
   if (index === -1) {
     res.status(404).json({ error: 'Task not found' });
     return;
+  }
+
+  const existingTask = db.tasks[index];
+  if (user.role === 'STAFF') {
+    const isAssigned = (user.linkedTeamMemberId && existingTask.assigneeId === user.linkedTeamMemberId);
+    if (!isAssigned) {
+      res.status(403).json({ error: 'Forbidden. You can only update tasks assigned to you.' });
+      return;
+    }
+    if (req.body.status) {
+      existingTask.status = req.body.status;
+      if (req.body.status === 'Completed' && !existingTask.completedDate) {
+        existingTask.completedDate = new Date().toISOString().split('T')[0];
+      }
+    }
+    db.tasks[index] = existingTask;
+    dbInstance.save();
+    return res.json(existingTask);
   }
 
   const updated = { ...db.tasks[index], ...req.body };
@@ -1427,7 +1534,7 @@ app.post('/api/payout-batch', requireAuth, requireAdmin, (req: Request, res: Res
 });
 
 // ================= AI BUSINESS BRIEFING (GEMINI 3.8 FLASH) ================= //
-app.post('/api/ai/briefing', requireAuth, async (req: Request, res: Response) => {
+app.post('/api/ai/briefing', requireAuth, requireAdmin, async (req: Request, res: Response) => {
   const db = dbInstance.getData();
 
   // Compute live studio metrics
@@ -1544,8 +1651,9 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, () => {
-    console.log(`Royal Studio Manager server listening on http://localhost:${PORT}`);
+  const port = Number(PORT);
+  app.listen(port, '0.0.0.0', () => {
+    console.log(`Royal Studio Manager server listening on http://0.0.0.0:${port}`);
   });
 }
 

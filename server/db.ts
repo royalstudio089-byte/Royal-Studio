@@ -85,19 +85,23 @@ function getInitialData(): DatabaseSchema {
   };
 
   const profile: AdminProfile = {
-    studioName: 'ROYAL STUDIO',
-    tagline: 'Premier Visuals & Cinema Management',
+    studioName: 'Royal Studio',
+    tagline: 'Luxury wedding photography, cinematic films, and brand shoots.',
+    description: 'Luxury wedding photography, cinematic films, and brand shoots.',
     logo: '/royal-logo.svg',
-    address: 'Plot 42-B, Main Boulevard, Gulberg III',
-    city: 'Lahore, Pakistan',
-    phone: '+92 300 1234567',
-    whatsapp: '+92 321 7654321',
+    address: 'Al Jannat Town Entrance, Canal Bungalow Road, Opposite Habib Mall, Burewala, Punjab 61010, Pakistan',
+    city: 'Burewala, Punjab, Pakistan',
+    phone: '0308-4877073',
+    phone2: '0303-2213806',
+    whatsapp: '0308-4877073',
     email: 'royalstudio089@gmail.com',
-    website: 'https://royalstudio.pk',
-    instagram: '@royalstudiopak',
-    facebook: 'royalstudiopak',
+    website: 'https://royalstudio.online',
+    instagram: 'https://www.instagram.com/royalstudio089',
+    facebook: 'https://www.facebook.com/royalstudio089',
+    youtube: 'https://www.youtube.com/@royalstudio089',
+    googleMapsUrl: 'https://maps.app.goo.gl/mQPek7wm4nCVjy8o9',
     bankName: 'Meezan Bank Ltd',
-    accountTitle: 'Royal Visual Studios PVT Ltd',
+    accountTitle: 'Royal Studio',
     accountNumber: '02010103456789',
     iban: 'PK45MEZN0002010103456789',
     taxRate: 5,
@@ -1136,6 +1140,59 @@ export class StudioDatabase {
         needsSave = true;
       }
     });
+
+    // Sync official Royal Studio business profile settings
+    if (this.db.profile) {
+      if (!this.db.profile.studioName || this.db.profile.studioName === 'ROYAL STUDIO') {
+        this.db.profile.studioName = 'Royal Studio';
+        needsSave = true;
+      }
+      if (!this.db.profile.address || this.db.profile.address.includes('Gulberg')) {
+        this.db.profile.address = 'Al Jannat Town Entrance, Canal Bungalow Road, Opposite Habib Mall, Burewala, Punjab 61010, Pakistan';
+        needsSave = true;
+      }
+      if (!this.db.profile.city || this.db.profile.city.includes('Lahore')) {
+        this.db.profile.city = 'Burewala, Punjab, Pakistan';
+        needsSave = true;
+      }
+      if (!this.db.profile.phone || this.db.profile.phone === '+92 300 1234567') {
+        this.db.profile.phone = '0308-4877073';
+        needsSave = true;
+      }
+      if (!this.db.profile.phone2) {
+        this.db.profile.phone2 = '0303-2213806';
+        needsSave = true;
+      }
+      if (!this.db.profile.whatsapp || this.db.profile.whatsapp === '+92 321 7654321') {
+        this.db.profile.whatsapp = '0308-4877073';
+        needsSave = true;
+      }
+      if (!this.db.profile.description || this.db.profile.tagline.includes('Premier')) {
+        this.db.profile.description = 'Luxury wedding photography, cinematic films, and brand shoots.';
+        this.db.profile.tagline = 'Luxury wedding photography, cinematic films, and brand shoots.';
+        needsSave = true;
+      }
+      if (!this.db.profile.facebook || this.db.profile.facebook === 'royalstudiopak') {
+        this.db.profile.facebook = 'https://www.facebook.com/royalstudio089';
+        needsSave = true;
+      }
+      if (!this.db.profile.instagram || this.db.profile.instagram === '@royalstudiopak') {
+        this.db.profile.instagram = 'https://www.instagram.com/royalstudio089';
+        needsSave = true;
+      }
+      if (!this.db.profile.youtube) {
+        this.db.profile.youtube = 'https://www.youtube.com/@royalstudio089';
+        needsSave = true;
+      }
+      if (!this.db.profile.googleMapsUrl) {
+        this.db.profile.googleMapsUrl = 'https://maps.app.goo.gl/mQPek7wm4nCVjy8o9';
+        needsSave = true;
+      }
+      if (!this.db.profile.website || this.db.profile.website.includes('.pk')) {
+        this.db.profile.website = 'https://royalstudio.online';
+        needsSave = true;
+      }
+    }
 
     if (needsSave) {
       this.save();
